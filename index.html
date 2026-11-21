@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>덴프스 · 매체 캠페인별 성과</title>
+<style>
+  :root{
+    --bg:#f7f8fa; --card:#ffffff; --card2:#f2f4f7; --card3:#e8ebf0; --border:#e2e6ec;
+    --text:#1a2233; --sub:#6b7686; --accent:#2563eb; --good:#16a34a; --bad:#dc2626;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",sans-serif;}
+  .wrap{max-width:1180px;margin:0 auto;padding:24px 20px 60px;}
+  header.top{margin-bottom:20px;}
+  header.top h1{font-size:21px;margin:0 0 6px;}
+  header.top p{margin:0 0 14px;color:var(--sub);font-size:13px;}
+
+  .toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+  .date-select{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .date-select label{font-size:12.5px;color:var(--sub);font-weight:600;}
+  .date-select input[type=date], .date-select select{
+    background:var(--card);border:1px solid var(--border);color:var(--text);
+    border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer;
+  }
+  .month-toggle{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--sub);cursor:pointer;}
+  .toolbar-right{display:flex;align-items:center;gap:10px;}
+  .built-at{font-size:12px;color:var(--sub);}
+  .refresh-btn{background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:8px;
+               padding:6px 14px;font-size:12.5px;font-weight:600;cursor:pointer;}
+  .refresh-btn:hover{background:var(--card2);}
+
+  .ch-tabs{display:flex;gap:8px;margin-bottom:20px;border-bottom:1px solid var(--border);}
+  .ch-tab{padding:10px 18px;color:var(--sub);cursor:pointer;font-size:14px;font-weight:600;border-bottom:2px solid transparent;}
+  .ch-tab.active{color:var(--text);border-bottom-color:var(--accent);}
+  .ch-panel{display:none;}
+  .ch-panel.active{display:block;}
+
+  section.medium{margin-top:28px;}
+  .sec-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+  .sec-head h2{font-size:16px;margin:0;}
+  .badge{font-size:11px;padding:3px 9px;border-radius:999px;font-weight:600;background:rgba(62,207,142,.15);color:var(--good);}
+  .badge.stale{background:rgba(245,166,35,.15);color:#b45309;}
+  .sec-sub{color:var(--sub);font-size:12.5px;}
+
+  .kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px;}
+  .kpi{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;}
+  .kpi .lab{font-size:10.5px;color:var(--sub);letter-spacing:.3px;text-transform:uppercase;}
+  .kpi .val{font-size:17px;font-weight:700;margin-top:3px;}
+  .roas-good{color:var(--good);} .roas-bad{color:var(--bad);}
+
+  .tree{border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+  .row{display:grid;grid-template-columns:1fr 85px 70px 110px 70px 110px 80px;gap:8px;align-items:center;
+       padding:8px 12px;font-size:13px;border-bottom:1px solid var(--card2);}
+  .row:last-child{border-bottom:none;}
+  .row.head{background:var(--card2);color:var(--sub);font-size:11px;font-weight:600;text-transform:uppercase;}
+  .row.campaign{background:var(--card);font-weight:600;cursor:pointer;user-select:none;}
+  .row.campaign:hover{background:var(--card2);}
+  .row.group{background:var(--card2);cursor:pointer;user-select:none;padding-left:26px;}
+  .row.group:hover{background:var(--card3);}
+  .row.item{background:var(--card3);padding-left:46px;color:var(--sub);}
+  .num{text-align:right;white-space:nowrap;}
+  .caret{display:inline-block;width:14px;color:var(--accent);}
+  .groups-wrap, .items-wrap{display:none;}
+  .groups-wrap.open, .items-wrap.open{display:block;}
+  .empty-note{color:var(--sub);font-size:12px;padding:12px;}
+  .loading{color:var(--sub);font-size:13px;padding:30px 0;text-align:center;}
+  .err{color:var(--bad);font-size:13px;padding:16px;border:1px solid var(--bad);border-radius:8px;margin-top:12px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>🏷️ 덴프스 · 매체 캠페인별 성과</h1>
+    <p>유통채널별로 메타·SA 캠페인 성과를 캠페인→그룹→소재 3단으로 봅니다. SA·메타는 AEER API 실시간 조회(전일 마감), GFA는 로컬에서 매시 푸시된 스냅샷입니다.</p>
+    <div class="toolbar">
+      <div class="date-select">
+        <label for="date-input">날짜</label>
+        <input type="date" id="date-input">
+        <label class="month-toggle"><input type="checkbox" id="month-toggle"> 이번달 누적으로 보기</label>
+      </div>
+      <div class="toolbar-right">
+        <span class="built-at" id="built-at">불러오는 중…</span>
+        <button class="refresh-btn" onclick="loadData()">↻ 새로고침</button>
+      </div>
+    </div>
+  </header>
+  <div class="ch-tabs" id="ch-tabs"></div>
+  <div id="ch-panels"><div class="loading">불러오는 중…</div></div>
+</div>
+
+<script>
+const MED_LABEL = {meta: '메타 (Meta)', gfa: '네이버 GFA (디스플레이, 유입·애드부스트 제외)'};
+const MED_ORDER_BASE = ['meta', 'gfa'];
+function medLabel(key){
+  if (MED_LABEL[key]) return MED_LABEL[key];
+  if (key.startsWith('sa_')) return '네이버 검색광고 — ' + key.slice(3);
+  return key;
+}
+function medOrderIndex(key){
+  const i = MED_ORDER_BASE.indexOf(key);
+  if (i >= 0) return i;
+  if (key.startsWith('sa_')) return 10;
+  return 99;
+}
+
+function fmt(n){ return Math.round(n).toLocaleString('ko-KR'); }
+function fmtPct(n){ return n.toFixed(1) + '%'; }
+function roasClass(r){ return r >= 100 ? 'roas-good' : 'roas-bad'; }
+
+function kpiCards(k){
+  return `<div class="kpi-grid">
+    <div class="kpi"><div class="lab">비용</div><div class="val">₩${fmt(k.cost)}</div></div>
+    <div class="kpi"><div class="lab">매출</div><div class="val">₩${fmt(k.revenue)}</div></div>
+    <div class="kpi"><div class="lab">구매</div><div class="val">${fmt(k.purchases)}건</div></div>
+    <div class="kpi"><div class="lab">ROAS</div><div class="val ${roasClass(k.roas)}">${fmtPct(k.roas)}</div></div>
+    <div class="kpi"><div class="lab">CTR</div><div class="val">${fmtPct(k.ctr)}</div></div>
+  </div>`;
+}
+
+let uid = 0;
+function itemRow(it){
+  const r = it.cost ? it.revenue/it.cost*100 : 0;
+  return `<div class="row item">
+    <div>${it.name}</div>
+    <div class="num">${fmt(it.impressions)}</div>
+    <div class="num">${fmt(it.clicks)}</div>
+    <div class="num">₩${fmt(it.cost)}</div>
+    <div class="num">${fmt(it.purchases)}</div>
+    <div class="num">₩${fmt(it.revenue)}</div>
+    <div class="num ${roasClass(r)}">${fmtPct(r)}</div>
+  </div>`;
+}
+
+function groupBlock(g){
+  const id = 'g' + (uid++);
+  const itemsHtml = g.items.map(itemRow).join('');
+  return `<div class="row group" onclick="toggleBlock('${id}')">
+    <div><span class="caret" id="${id}-caret">▸</span>${g.name}</div>
+    <div class="num">${fmt(g.kpi.impressions)}</div>
+    <div class="num">${fmt(g.kpi.clicks)}</div>
+    <div class="num">₩${fmt(g.kpi.cost)}</div>
+    <div class="num">${fmt(g.kpi.purchases)}</div>
+    <div class="num">₩${fmt(g.kpi.revenue)}</div>
+    <div class="num ${roasClass(g.kpi.roas)}">${fmtPct(g.kpi.roas)}</div>
+  </div>
+  <div class="items-wrap" id="${id}">${itemsHtml}</div>`;
+}
+
+function campaignBlock(c){
+  const id = 'c' + (uid++);
+  const groupsHtml = c.groups.map(groupBlock).join('');
+  return `<div class="row campaign" onclick="toggleBlock('${id}')">
+    <div><span class="caret" id="${id}-caret">▸</span>${c.name}</div>
+    <div class="num">${fmt(c.kpi.impressions)}</div>
+    <div class="num">${fmt(c.kpi.clicks)}</div>
+    <div class="num">₩${fmt(c.kpi.cost)}</div>
+    <div class="num">${fmt(c.kpi.purchases)}</div>
+    <div class="num">₩${fmt(c.kpi.revenue)}</div>
+    <div class="num ${roasClass(c.kpi.roas)}">${fmtPct(c.kpi.roas)}</div>
+  </div>
+  <div class="groups-wrap" id="${id}">${groupsHtml}</div>`;
+}
+
+function toggleBlock(id){
+  const el = document.getElementById(id);
+  const caret = document.getElementById(id + '-caret');
+  const open = el.classList.toggle('open');
+  caret.textContent = open ? '▾' : '▸';
+}
+window.toggleBlock = toggleBlock;
+
+function mediumSection(medKey, data, badgeText, badgeClass){
+  if (!data || !data.campaigns || !data.campaigns.length){
+    return `<section class="medium"><div class="sec-head"><h2>${medLabel(medKey)}</h2><span class="sec-sub">데이터 없음</span></div></section>`;
+  }
+  const rows = data.campaigns.map(campaignBlock).join('');
+  return `<section class="medium">
+    <div class="sec-head">
+      <h2>${medLabel(medKey)}</h2>
+      <span class="badge ${badgeClass||''}">${badgeText}</span>
+      <span class="sec-sub">기준 ${data.date} · 캠페인 ${data.campaigns.length}개</span>
+    </div>
+    ${kpiCards(data.kpi)}
+    <div class="tree">
+      <div class="row head"><div>캠페인 / 그룹 / 소재</div><div class="num">노출</div><div class="num">클릭</div><div class="num">비용</div><div class="num">구매</div><div class="num">매출</div><div class="num">ROAS</div></div>
+      ${rows}
+    </div>
+  </section>`;
+}
+
+let CURRENT = { 스마트스토어: {}, 자사몰: {}, 올리브영: {} };
+let currentChannel = null;
+
+function channelPanel(ch){
+  const block = CURRENT[ch] || {};
+  const keys = Object.keys(block).sort((a, b) => medOrderIndex(a) - medOrderIndex(b));
+  if (!keys.length) return `<div class="empty-note">이 유통채널에는 해당 날짜 데이터가 없습니다.</div>`;
+  return keys.map(m => {
+    if (m === 'gfa') return mediumSection(m, block[m], 'GFA 최근 푸시', 'stale');
+    return mediumSection(m, block[m], '전일 마감(AEER)');
+  }).join('');
+}
+
+function renderPanels(){
+  const channels = Object.keys(CURRENT);
+  if (!currentChannel || !channels.includes(currentChannel)) currentChannel = channels[0];
+  document.getElementById('ch-tabs').innerHTML = channels.map(ch =>
+    `<div class="ch-tab ${ch===currentChannel?'active':''}" data-ch="${ch}" onclick="selectChannel('${ch}')">${ch}</div>`).join('');
+  document.getElementById('ch-panels').innerHTML = channels.map(ch =>
+    `<div class="ch-panel ${ch===currentChannel?'active':''}" id="panel-${ch}">${channelPanel(ch)}</div>`).join('');
+}
+
+function selectChannel(ch){
+  currentChannel = ch;
+  document.querySelectorAll('.ch-tab').forEach(t => t.classList.toggle('active', t.dataset.ch === ch));
+  document.querySelectorAll('.ch-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + ch));
+}
+window.selectChannel = selectChannel;
+
+function mergeGfa(data, gfa){
+  if (gfa && gfa.data && gfa.data['스마트스토어'] && gfa.data['스마트스토어']['gfa']){
+    data['스마트스토어'] = data['스마트스토어'] || {};
+    data['스마트스토어']['gfa'] = gfa.data['스마트스토어']['gfa'];
+  }
+  return data;
+}
+
+async function loadData(){
+  document.getElementById('ch-panels').innerHTML = '<div class="loading">불러오는 중…</div>';
+  document.getElementById('built-at').textContent = '불러오는 중…';
+  const monthMode = document.getElementById('month-toggle').checked;
+  const dateVal = document.getElementById('date-input').value;
+  const q = monthMode ? 'month' : dateVal;
+  try{
+    const [aeerRes, gfaRes] = await Promise.allSettled([
+      fetch('/api/data?date=' + encodeURIComponent(q)).then(r => r.json()),
+      fetch('/gfa_latest.json?_=' + Date.now()).then(r => r.ok ? r.json() : null).catch(() => null),
+    ]);
+    if (aeerRes.status !== 'fulfilled' || aeerRes.value.error) {
+      throw new Error((aeerRes.value && aeerRes.value.error) || 'AEER 조회 실패');
+    }
+    const aeer = aeerRes.value;
+    CURRENT = aeer.data;
+    if (!monthMode && gfaRes.status === 'fulfilled' && gfaRes.value) {
+      CURRENT = mergeGfa(CURRENT, gfaRes.value);
+    }
+    currentChannel = null;
+    renderPanels();
+    const gfaNote = (gfaRes.status === 'fulfilled' && gfaRes.value && gfaRes.value.fetched_at)
+      ? ` · GFA 푸시: ${gfaRes.value.fetched_at}` : '';
+    document.getElementById('built-at').textContent =
+      `데이터 기준: ${aeer.meta.date_label}${gfaNote}`;
+  } catch (e) {
+    document.getElementById('ch-panels').innerHTML = `<div class="err">데이터를 불러오지 못했습니다: ${e.message}</div>`;
+    document.getElementById('built-at').textContent = '오류';
+  }
+}
+window.loadData = loadData;
+
+// 초기화: 날짜 입력 기본값 = 어제(KST)
+const kstNow = new Date(Date.now() + 9*3600*1000);
+const yest = new Date(kstNow); yest.setUTCDate(yest.getUTCDate() - 1);
+document.getElementById('date-input').value = yest.toISOString().slice(0,10);
+document.getElementById('date-input').max = yest.toISOString().slice(0,10);
+document.getElementById('date-input').addEventListener('change', () => { document.getElementById('month-toggle').checked = false; loadData(); });
+document.getElementById('month-toggle').addEventListener('change', loadData);
+
+loadData();
+</script>
+</body>
+</html>
