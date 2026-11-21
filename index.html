@@ -235,7 +235,8 @@ async function loadData(){
   try{
     const [aeerRes, gfaRes] = await Promise.allSettled([
       fetch('/api/data?date=' + encodeURIComponent(q)).then(r => r.json()),
-      fetch('/gfa_latest.json?_=' + Date.now()).then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch('https://raw.githubusercontent.com/yeajinkwak-maker/denps-dashboard/master/gfa_latest.json?_=' + Date.now())
+        .then(r => r.ok ? r.json() : null).catch(() => null),
     ]);
     if (aeerRes.status !== 'fulfilled' || aeerRes.value.error) {
       throw new Error((aeerRes.value && aeerRes.value.error) || 'AEER 조회 실패');
