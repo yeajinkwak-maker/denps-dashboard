@@ -24,6 +24,9 @@
     border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer;
   }
   .month-toggle{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--sub);cursor:pointer;}
+  .mode-group{display:flex;gap:4px;background:var(--card2);border:1px solid var(--border);border-radius:999px;padding:3px;}
+  .mode-btn{padding:6px 14px;border-radius:999px;font-size:12.5px;font-weight:600;color:var(--sub);cursor:pointer;border:none;background:transparent;}
+  .mode-btn.active{background:var(--accent);color:#fff;}
   .toolbar-right{display:flex;align-items:center;gap:10px;}
   .built-at{font-size:12px;color:var(--sub);}
   .refresh-btn{background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:8px;
@@ -72,12 +75,15 @@
 <div class="wrap">
   <header class="top">
     <h1>🏷️ 덴프스 · 매체 캠페인별 성과</h1>
-    <p>유통채널별로 메타·SA 캠페인 성과를 캠페인→그룹→소재 3단으로 봅니다. SA·메타는 AEER API 실시간 조회(전일 마감), GFA는 로컬에서 매시 푸시된 스냅샷입니다.</p>
+    <p>유통채널별로 메타·GFA·SA 캠페인 성과를 캠페인→그룹→소재 3단으로 봅니다. "오늘"은 로컬 PC가 매시 올려주는 실시간 스냅샷, 날짜 선택·이번달 누적은 AEER API 실시간 조회(전일 마감)입니다.</p>
     <div class="toolbar">
       <div class="date-select">
-        <label for="date-input">날짜</label>
-        <input type="date" id="date-input">
-        <label class="month-toggle"><input type="checkbox" id="month-toggle"> 이번달 누적으로 보기</label>
+        <div class="mode-group">
+          <button class="mode-btn active" id="mode-today" onclick="setMode('today')">오늘(실시간)</button>
+          <button class="mode-btn" id="mode-date" onclick="setMode('date')">날짜 선택</button>
+          <button class="mode-btn" id="mode-month" onclick="setMode('month')">이번달 누적</button>
+        </div>
+        <input type="date" id="date-input" style="display:none">
       </div>
       <div class="toolbar-right">
         <span class="built-at" id="built-at">불러오는 중…</span>
@@ -192,11 +198,13 @@ function mediumSection(medKey, data, badgeText, badgeClass){
 let CURRENT = { 스마트스토어: {}, 자사몰: {}, 올리브영: {} };
 let currentChannel = null;
 
+let CURRENT_MODE = 'today';
 function channelPanel(ch){
   const block = CURRENT[ch] || {};
   const keys = Object.keys(block).sort((a, b) => medOrderIndex(a) - medOrderIndex(b));
   if (!keys.length) return `<div class="empty-note">이 유통채널에는 해당 날짜 데이터가 없습니다.</div>`;
   return keys.map(m => {
+    if (CURRENT_MODE === 'today') return mediumSection(m, block[m], '실시간 (오늘)');
     if (m === 'gfa') return mediumSection(m, block[m], 'GFA 최근 푸시', 'stale');
     return mediumSection(m, block[m], '전일 마감(AEER)');
   }).join('');
@@ -218,40 +226,41 @@ function selectChannel(ch){
 }
 window.selectChannel = selectChannel;
 
-function mergeGfa(data, gfa){
-  if (gfa && gfa.data && gfa.data['스마트스토어'] && gfa.data['스마트스토어']['gfa']){
-    data['스마트스토어'] = data['스마트스토어'] || {};
-    data['스마트스토어']['gfa'] = gfa.data['스마트스토어']['gfa'];
-  }
-  return data;
+function setMode(mode){
+  CURRENT_MODE = mode;
+  ['today','date','month'].forEach(m => document.getElementById('mode-' + m).classList.toggle('active', m === mode));
+  document.getElementById('date-input').style.display = (mode === 'date') ? 'inline-block' : 'none';
+  loadData();
+}
+window.setMode = setMode;
+
+async function loadToday(){
+  const r = await fetch('https://raw.githubusercontent.com/yeajinkwak-maker/denps-dashboard/master/today_latest.json?_=' + Date.now());
+  if (!r.ok) throw new Error('오늘자 스냅샷을 아직 못 받아왔습니다(로컬 PC가 꺼져있을 수 있음)');
+  const payload = await r.json();
+  CURRENT = payload.data || {};
+  currentChannel = null;
+  renderPanels();
+  document.getElementById('built-at').textContent = `오늘 실시간 · 최근 푸시: ${payload.fetched_at || '-'}`;
+}
+
+async function loadAeer(q){
+  const r = await fetch('/api/data?date=' + encodeURIComponent(q));
+  const aeer = await r.json();
+  if (aeer.error) throw new Error(aeer.error);
+  CURRENT = aeer.data;
+  currentChannel = null;
+  renderPanels();
+  document.getElementById('built-at').textContent = `데이터 기준: ${aeer.meta.date_label} (AEER, 전일 마감)`;
 }
 
 async function loadData(){
   document.getElementById('ch-panels').innerHTML = '<div class="loading">불러오는 중…</div>';
   document.getElementById('built-at').textContent = '불러오는 중…';
-  const monthMode = document.getElementById('month-toggle').checked;
-  const dateVal = document.getElementById('date-input').value;
-  const q = monthMode ? 'month' : dateVal;
   try{
-    const [aeerRes, gfaRes] = await Promise.allSettled([
-      fetch('/api/data?date=' + encodeURIComponent(q)).then(r => r.json()),
-      fetch('https://raw.githubusercontent.com/yeajinkwak-maker/denps-dashboard/master/gfa_latest.json?_=' + Date.now())
-        .then(r => r.ok ? r.json() : null).catch(() => null),
-    ]);
-    if (aeerRes.status !== 'fulfilled' || aeerRes.value.error) {
-      throw new Error((aeerRes.value && aeerRes.value.error) || 'AEER 조회 실패');
-    }
-    const aeer = aeerRes.value;
-    CURRENT = aeer.data;
-    if (!monthMode && gfaRes.status === 'fulfilled' && gfaRes.value) {
-      CURRENT = mergeGfa(CURRENT, gfaRes.value);
-    }
-    currentChannel = null;
-    renderPanels();
-    const gfaNote = (gfaRes.status === 'fulfilled' && gfaRes.value && gfaRes.value.fetched_at)
-      ? ` · GFA 푸시: ${gfaRes.value.fetched_at}` : '';
-    document.getElementById('built-at').textContent =
-      `데이터 기준: ${aeer.meta.date_label}${gfaNote}`;
+    if (CURRENT_MODE === 'today') await loadToday();
+    else if (CURRENT_MODE === 'month') await loadAeer('month');
+    else await loadAeer(document.getElementById('date-input').value);
   } catch (e) {
     document.getElementById('ch-panels').innerHTML = `<div class="err">데이터를 불러오지 못했습니다: ${e.message}</div>`;
     document.getElementById('built-at').textContent = '오류';
@@ -259,13 +268,12 @@ async function loadData(){
 }
 window.loadData = loadData;
 
-// 초기화: 날짜 입력 기본값 = 어제(KST)
+// 초기화: 날짜 입력 기본값 = 어제(KST), 기본 모드 = 오늘(실시간)
 const kstNow = new Date(Date.now() + 9*3600*1000);
 const yest = new Date(kstNow); yest.setUTCDate(yest.getUTCDate() - 1);
 document.getElementById('date-input').value = yest.toISOString().slice(0,10);
 document.getElementById('date-input').max = yest.toISOString().slice(0,10);
-document.getElementById('date-input').addEventListener('change', () => { document.getElementById('month-toggle').checked = false; loadData(); });
-document.getElementById('month-toggle').addEventListener('change', loadData);
+document.getElementById('date-input').addEventListener('change', loadData);
 
 loadData();
 </script>
