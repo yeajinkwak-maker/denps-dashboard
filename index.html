@@ -96,8 +96,8 @@
 </div>
 
 <script>
-const MED_LABEL = {meta: '메타 (Meta)', gfa: '네이버 GFA (디스플레이, 유입·애드부스트 제외)'};
-const MED_ORDER_BASE = ['meta', 'gfa'];
+const MED_LABEL = {meta: '메타 (Meta)', gfa: '네이버 GFA (디스플레이, 유입·애드부스트 제외)', advoost: '네이버 애드부스트 (ADVoost)'};
+const MED_ORDER_BASE = ['meta', 'gfa', 'advoost'];
 function medLabel(key){
   if (MED_LABEL[key]) return MED_LABEL[key];
   if (key.startsWith('sa_')) return '네이버 검색광고 — ' + key.slice(3);
